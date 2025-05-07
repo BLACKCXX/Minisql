@@ -17,6 +17,14 @@
 #include "planner/planner.h"
 #include "utils/utils.h"
 
+extern "C"{
+int yyparse(void);
+#include "parser/minisql_lex.h"
+#include "parser/parser.h"
+}
+
+using namespace std;
+
 ExecuteEngine::ExecuteEngine() {
   char path[] = "./databases";
   DIR *dir;
@@ -24,9 +32,7 @@ ExecuteEngine::ExecuteEngine() {
     mkdir("./databases", 0777);
     dir = opendir(path);
   }
-  /** When you have completed all the code for
-   *  the test, run it using main.cpp and uncomment
-   *  this part of the code.
+
   struct dirent *stdir;
   while((stdir = readdir(dir)) != nullptr) {
     if( strcmp( stdir->d_name , "." ) == 0 ||
@@ -35,7 +41,7 @@ ExecuteEngine::ExecuteEngine() {
       continue;
     dbs_[stdir->d_name] = new DBStorageEngine(stdir->d_name, false);
   }
-   **/
+
   closedir(dir);
 }
 
@@ -243,8 +249,8 @@ dberr_t ExecuteEngine::ExecuteCreateDatabase(pSyntaxNode ast, ExecuteContext *co
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteCreateDatabase" << std::endl;
 #endif
-  string db_name = ast->child_->val_;
-  if (dbs_.find(db_name) != dbs_.end()) {
+  string db_name = ast->child_->val_;            //创建的数据库名称
+  if (dbs_.find(db_name) != dbs_.end()) {       //要创建的数据库已经存在
     return DB_ALREADY_EXIST;
   }
   dbs_.insert(make_pair(db_name, new DBStorageEngine(db_name, true)));
@@ -255,8 +261,8 @@ dberr_t ExecuteEngine::ExecuteDropDatabase(pSyntaxNode ast, ExecuteContext *cont
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteDropDatabase" << std::endl;
 #endif
-  string db_name = ast->child_->val_;
-  if (dbs_.find(db_name) == dbs_.end()) {
+  string db_name = ast->child_->val_;            //要删除的数据库名称
+  if (dbs_.find(db_name) == dbs_.end()) {          //要删除的数据库不存在
     return DB_NOT_EXIST;
   }
   remove(("./databases/" + db_name).c_str());
@@ -271,7 +277,7 @@ dberr_t ExecuteEngine::ExecuteShowDatabases(pSyntaxNode ast, ExecuteContext *con
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteShowDatabases" << std::endl;
 #endif
-  if (dbs_.empty()) {
+  if (dbs_.empty()) {            //要显示的数据库为空，立即完成
     cout << "Empty set (0.00 sec)" << endl;
     return DB_SUCCESS;
   }
@@ -297,25 +303,25 @@ dberr_t ExecuteEngine::ExecuteUseDatabase(pSyntaxNode ast, ExecuteContext *conte
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteUseDatabase" << std::endl;
 #endif
-  string db_name = ast->child_->val_;
-  if (dbs_.find(db_name) != dbs_.end()) {
+  string db_name = ast->child_->val_;            //要使用的数据库名称
+  if (dbs_.find(db_name) != dbs_.end()) {        //要使用的数据库存在
     current_db_ = db_name;
     cout << "Database changed" << endl;
     return DB_SUCCESS;
   }
-  return DB_NOT_EXIST;
+  return DB_NOT_EXIST;             //要使用的数据库不存在
 }
 
 dberr_t ExecuteEngine::ExecuteShowTables(pSyntaxNode ast, ExecuteContext *context) {
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteShowTables" << std::endl;
 #endif
-  if (current_db_.empty()) {
+  if (current_db_.empty()) {             //当前数据库为空
     cout << "No database selected" << endl;
     return DB_FAILED;
   }
   vector<TableInfo *> tables;
-  if (dbs_[current_db_]->catalog_mgr_->GetTables(tables) == DB_FAILED) {
+  if (dbs_[current_db_]->catalog_mgr_->GetTables(tables) == DB_FAILED) {        //获取当前数据库中的所有表失败
     cout << "Empty set (0.00 sec)" << endl;
     return DB_FAILED;
   }
@@ -340,12 +346,208 @@ dberr_t ExecuteEngine::ExecuteShowTables(pSyntaxNode ast, ExecuteContext *contex
 /**
  * TODO: Student Implement
  */
+/*创建表：自行设计*/
 dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *context) {
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteCreateTable" << std::endl;
 #endif
-  return DB_FAILED;
+   /*该函数功能
+    *解析SQL AST 并执行 create table 操作
+    *1.从AST提取表名、列定义、primary key, unique等信息
+    *2.构建column 对象集合并生成schema
+    *3.调用catalog manager创建表和索引，同时保证异常安全性
+    */
+  //定义工具函数，判断节点值是否与指定的字符串相等
+  auto isnode_same = [&](pSyntaxNode node, const char* str) {
+    //当Node或者node->val_为nullptr时不匹配
+    if (node == nullptr || node->val_ == nullptr) {
+      return false;
+    }
+    //节点值与传入的字符串相等
+    if (strcmp(node->val_, str) == 0) {
+      return true;
+    }
+    return false;
+  };
+
+  //解析出表名信息
+  //AST根节点的第一个子节点对应表名
+  pSyntaxNode table_node = ast->child_;
+  if (table_node == nullptr || table_node->val_ == nullptr) {
+    //如果表节点不存在或者其值为空，返回失败
+    return DB_FAILED;
+  }
+  //否则继续解析，得到表名字符串
+  string table_name;
+  table_name = table_node->val_;
+
+
+  //获取列定义列表的起始节点
+  pSyntaxNode column_headnode = nullptr;
+  //列定义列表容器
+  pSyntaxNode column_vector = table_node->next_;
+  //若列定义列表容器不为空
+  if (column_vector != nullptr) {
+    //通过child_获取实际第一个列定义节点
+    column_headnode  = column_vector->child_;
+  }
+  //如果列定义列表缺失，返回失败
+  if (column_headnode == nullptr) {
+    return DB_FAILED;
+  }
+
+  //收集所有主键列名
+  //创建字符串容器，用于存储主键列名称
+  vector<string> primary_keys;
+  for (pSyntaxNode tmp_node = column_headnode; tmp_node != nullptr; tmp_node = tmp_node->next_) {
+    //遍历同级节点，寻找primary keys
+    if (isnode_same(tmp_node, "primary keys")) {
+      for (pSyntaxNode cur = tmp_node->child_; cur != nullptr; cur = cur->next_) {
+        if (cur->val_ != nullptr) {           //若子节点字面量非空，则存储其主键列名到容器中
+          primary_keys.push_back(cur->val_);
+        }
+      }
+      break;         //找到后停止遍历
+    }
+  }
+
+  //处理列定义，构建column对象集合
+  vector<unique_ptr<Column>> columns;
+  //列在表中的位置索引
+  int idx = 0;
+  for (pSyntaxNode col_node = column_headnode; col_node != nullptr; col_node = col_node->next_) {
+    //如果遇到主键定义节点，则跳出循环
+    if (isnode_same(col_node, "primary keys")) {
+      break;
+    }
+
+    //首先获取列名
+    //child_节点保存列名信息
+    pSyntaxNode col_name_node = col_node->child_;
+    //如果列名节点缺失或其值信息为空，则返回失败
+    if (col_name_node != nullptr && col_name_node->val_ != nullptr) {
+      return DB_FAILED;
+    }
+    //否则继续解析，得到列名字符串
+    string col_name;
+    col_name = col_name_node->val_;
+
+    //然后获取节点类型
+    //next_节点保存类型描述信息
+    pSyntaxNode col_type_node = col_node->next_;
+    //如果节点类型节点缺失或其值信息为空，则返回失败
+    if (col_type_node != nullptr && col_type_node->val_ != nullptr) {
+      return DB_FAILED;
+    }
+    //否则继续解析，得到列类型
+    string col_type;
+    col_type = col_type_node->val_;
+
+    //初始化约束条件标志（notnull和unique)
+    bool not_null = false;
+    bool is_unique = false;
+
+    //如果其在主键列表中，必定为notnull和unique
+    //在存储主键列名的容器中找到了该列
+    if (find(primary_keys.begin(), primary_keys.end(), col_name) != primary_keys.end()) {
+      not_null = true;
+      is_unique = true;
+    }
+
+    //解析显式的"not null”关键字
+    if (isnode_same(col_node, "not null")) {
+      not_null = true;
+    }
+
+    //解析显式的“unique”关键字
+    if (isnode_same(col_node, "unique")) {
+      is_unique = true;
+    }
+
+    //根据类型创建column对象
+    TypeId type;
+    //对于char类型，存储其长度；对于其他类型，存储位置索引
+    int length_or_index = idx;
+    //如果类型为int
+    if (col_type == "int") {
+      type = kTypeInt;
+    }
+    //如果类型为float
+    else if (col_type == "float") {
+      type = kTypeFloat;
+    }
+    //如果类型为char
+    else if (col_type == "char") {
+      //开始解析长度值
+      pSyntaxNode length_node = col_type_node->child_;
+      //如果长度节点缺失或者其值信息为空，则返回失败
+      if (length_node != nullptr && length_node->val_ != nullptr) {
+        return DB_FAILED;
+      }
+      //得到double类型的长度
+      double length = atof(length_node->val_);
+      //如果长度非法，发出警告并返回失败
+      if (length < 0 || length > INT32_MAX || length != floor(length)) {
+        LOG(WARNING) << "Invalid char length :" << length_node->val_;
+        return DB_FAILED;
+      }
+
+      //向下取整为长度
+      length_or_index = static_cast<int>(length);
+      type = kTypeChar;
+    }
+    //其他不支持的类型，发出警告并返回失败
+    else {
+      LOG(WARNING) << "This column type is not supported :" << col_type;
+      return DB_FAILED;
+    }
+
+    /*构造并保存Column智能指针
+     *列名
+     *列类型
+     *列位置索引或char长度
+     *not null约束条件
+     *unique 约束条件
+     */
+    columns.emplace_back(new Column(col_name, type, length_or_index,not_null, is_unique));
+
+    //增加下一列的位置索引
+    idx++;
+  }
+
+  //转换智能指针，构造schema
+  vector<Column*> column_set;
+  column_set.reserve(columns.size());
+  //使用迭代器获取Column*并加入集合
+  for (auto &ite_column : columns) {
+    column_set.emplace_back(ite_column.get());
+  }
+
+  //基于列集合创建Schema
+  Schema* schema = new Schema(column_set);
+
+  //调用catalog manager，执行创建表操作
+  TableInfo* table_info = nullptr;
+  //调用CreateTable函数，传入表名、表结构定义、主键参数在索引阶段进行处理、输出参数为表元信息指针
+  dberr_t status =dbs_[current_db_]->catalog_mgr_->CreateTable(table_name, schema, nullptr, table_info);
+
+  //若创建失败，则直接返回错误码
+  if (status != DB_SUCCESS) {
+    return status;
+  }
+
+  //为主键列创建索引
+  for(const auto& primary_col : primary_keys) {
+       //创建索引名称
+       string index_name;
+       index_name = table_name + "_idx_" + primary_col;
+
+       IndexInfo* index_info = nullptr;
+       //调用catalog manager的CreateIndex函数，传入所属表名称、索引名称、索引列列表、输出参数为索引元信息指针，索引类型为bptree
+       dbs_[current_db_]->catalog_mgr_->CreateIndex(table_name, index_name, {primary_col}, nullptr, index_info, "bptree");
+  }
 }
+
 
 /**
  * TODO: Student Implement
