@@ -1,0 +1,25 @@
+bin/
+build/
+dbfiles/
+datas/
+.vscode/
+.idea/
+cmake-build-debug/
+cmake-build-release/
+# 忽略构建目录
+cmake-build-*/
+build/
+bin/
+lib/
+
+# 忽略编译生成的文件
+*.so
+*.exe
+*.dll
+*.a
+*.obj
+*.o
+
+# 忽略 IDE 配置文件
+.idea/
+.vscode/
