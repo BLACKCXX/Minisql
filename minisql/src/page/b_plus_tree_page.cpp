@@ -1,3 +1,4 @@
+#include <cmath>                      // For ceil function
 #include "page/b_plus_tree_page.h"
 
 /*
@@ -8,6 +9,9 @@
  * TODO: Student Implement
  */
 bool BPlusTreePage::IsLeafPage() const {
+  if (page_type_ == IndexPageType :: LEAF_PAGE) // Determine leaf type
+    return true;
+
   return false;
 }
 
@@ -15,6 +19,9 @@ bool BPlusTreePage::IsLeafPage() const {
  * TODO: Student Implement
  */
 bool BPlusTreePage::IsRootPage() const {
+  if (parent_page_id_ == INVALID_PAGE_ID) // Determine root type
+    return true;
+
   return false;
 }
 
@@ -22,7 +29,7 @@ bool BPlusTreePage::IsRootPage() const {
  * TODO: Student Implement
  */
 void BPlusTreePage::SetPageType(IndexPageType page_type) {
-
+  page_type_ = page_type;    // Set type
 }
 
 int BPlusTreePage::GetKeySize() const {
@@ -38,7 +45,7 @@ void BPlusTreePage::SetKeySize(int size) {
  * page)
  */
 int BPlusTreePage::GetSize() const {
-  return size_;
+  return size_; // Current size (number)
 }
 
 void BPlusTreePage::SetSize(int size) {
@@ -56,14 +63,14 @@ void BPlusTreePage::IncreaseSize(int amount) {
  * TODO: Student Implement
  */
 int BPlusTreePage::GetMaxSize() const {
-  return 0;
+  return max_size_;
 }
 
 /**
  * TODO: Student Implement
  */
 void BPlusTreePage::SetMaxSize(int size) {
-
+  max_size_ = size;
 }
 
 /*
@@ -73,8 +80,22 @@ void BPlusTreePage::SetMaxSize(int size) {
 /**
  * TODO: Student Implement
  */
+
+// Three scenarios: root, leaf, between(neither root nor leaf)
 int BPlusTreePage::GetMinSize() const {
-  return 0;
+  int result = 0;
+  // root scenario
+  if (this->IsRootPage())
+    result = 2;
+  // leaf scenario
+  else if (this->IsLeafPage())
+    result = int(ceil(1.0 * (max_size_ - 1) / 2));
+  // internal, not root not leaf
+  else
+    result = int(ceil(1.0 * max_size_ / 2));
+  
+  return result;
+  // return 0;
 }
 
 /*
@@ -84,7 +105,7 @@ int BPlusTreePage::GetMinSize() const {
  * TODO: Student Implement
  */
 page_id_t BPlusTreePage::GetParentPageId() const {
-  return INVALID_PAGE_ID;
+  return parent_page_id_; // Get parent page id
 }
 
 void BPlusTreePage::SetParentPageId(page_id_t parent_page_id) {
