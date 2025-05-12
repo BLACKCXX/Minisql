@@ -28,10 +28,10 @@ uint32_t TableMetadata::SerializeTo(char *buf) const {
  * TODO: Student Implement
  */
 uint32_t TableMetadata::GetSerializedSize() const {
-  return 4 + 4 + MACH_STR_SERIALIZED_SIZE(table_name_) + 4 + schema_->GetSerializedSize();
+  return 4 + 4 + 4 + table_name_.length() + 4 + schema_->GetSerializedSize();
 }
 
-/**
+/*
  *
  * @param heap Memory heap passed by TableInfo
  */
@@ -57,7 +57,8 @@ uint32_t TableMetadata::DeserializeFrom(char *buf, TableMetadata *&table_meta) {
   buf += 4;
   // table schema
   TableSchema *schema = nullptr;
-  buf += TableSchema::DeserializeFrom(buf, schema);
+  uint32_t schema_size = TableSchema::DeserializeFrom(buf, schema);
+  buf += schema_size;
   // allocate space for table metadata
   table_meta = new TableMetadata(table_id, table_name, root_page_id, schema);
   return buf - p;
