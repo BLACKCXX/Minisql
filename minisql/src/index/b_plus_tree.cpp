@@ -11,24 +11,25 @@
  * TODO: Student Implement
  */
 BPlusTree::BPlusTree(index_id_t index_id, BufferPoolManager *buffer_pool_manager, const KeyManager &KM,
-                     int leaf_max_size, int internal_max_size)
-    : index_id_(index_id),
-      buffer_pool_manager_(buffer_pool_manager),
-      processor_(KM),
-      leaf_max_size_(leaf_max_size),
-      internal_max_size_(internal_max_size) {
-  
-  auto page = buffer_pool_manager->FetchPage(INDEX_ROOTS_PAGE_ID); // fetching the index root page
-  if (page != nullptr)
-  {
-    page_id_t temp_root_id;
-    auto temp_page = reinterpret_cast<IndexRootsPage*>(page);
-    if (temp_page->GetRootId(index_id, &temp_root_id))             //  this function save it to second parameter: temp_root_id
-      root_page_id_ = temp_root_id;
-    else
-      root_page_id_ = INVALID_PAGE_ID;                             //  not found
-    buffer_pool_manager->UnpinPage(INDEX_ROOTS_PAGE_ID, false);    //  not modified
+  int leaf_max_size, int internal_max_size)
+: index_id_(index_id),
+  buffer_pool_manager_(buffer_pool_manager),
+  processor_(KM),
+  leaf_max_size_(leaf_max_size),
+  internal_max_size_(internal_max_size) {
+  if(leaf_max_size_ == 0)
+  leaf_max_size_ = LEAF_PAGE_SIZE;
+  if(internal_max_size_ == 0)
+  internal_max_size_ = INTERNAL_PAGE_SIZE;
+  //initialize root_page_id_
+  auto index_root_pages = reinterpret_cast<IndexRootsPage *>(buffer_pool_manager_->FetchPage(INDEX_ROOTS_PAGE_ID));
+  page_id_t root_page_id;
+  if(index_root_pages->GetRootId(index_id_, &root_page_id)) {
+  root_page_id_ = root_page_id;
+  } else {
+  root_page_id_ = INVALID_PAGE_ID;
   }
+  buffer_pool_manager_->UnpinPage(INDEX_ROOTS_PAGE_ID, false);
 }
 
 void BPlusTree::Destroy(page_id_t current_page_id) {

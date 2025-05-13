@@ -286,36 +286,34 @@ void InternalPage::CopyLastFrom(GenericKey *key, const page_id_t value, BufferPo
  * moved to the recipient
  */
 void InternalPage::MoveLastToFrontOf(InternalPage *recipient, GenericKey *middle_key, BufferPoolManager *buffer_pool_manager) {
-  // This function do not update parent node
-  int last_index = GetSize() - 1;      // The last index of the current 
+  int size = GetSize();
+  if(size == GetMinSize() || recipient->GetSize() == recipient->GetMaxSize()) {
+    LOG(ERROR) << "Move overflow / underflow" << endl;
+    return;
+  }
+  // Key[0] will be moved to Key[1] later
   recipient->SetKeyAt(0, middle_key);
-  recipient->CopyFirstFrom(ValueAt(last_index), buffer_pool_manager);
-  recipient->SetKeyAt(0, KeyAt(last_index));   // The actual key from last
-  Remove(last_index);                                  
+  recipient->CopyFirstFrom(KeyAt(size - 1), ValueAt(size - 1), buffer_pool_manager);
+  // Change middle key by first key
+  *middle_key = *KeyAt(size - 1);
+  // Remove last pair
+  Remove(size - 1);                                 
 }
 
 /* Append an entry at the beginning.
  * Since it is an internal page, the moved entry(page)'s parent needs to be updated.
  * So I need to 'adopt' it by changing its parent page id, which needs to be persisted with BufferPoolManger
  */
-void InternalPage::CopyFirstFrom(const page_id_t value, BufferPoolManager *buffer_pool_manager) {
-  int temp_size = GetSize();
-  GenericKey* temp_key = nullptr;
-  page_id_t temp_value = 0;
-
-  // shift right 
-  for (int i = temp_size - 1; i >= 0; i--)
-  {
-    temp_key = KeyAt(i);
-    temp_value = ValueAt(i);
-    SetKeyAt(i + 1, temp_key);
-    SetValueAt(i + 1, temp_value);
+void InternalPage::CopyFirstFrom(GenericKey *key, const page_id_t value, BufferPoolManager *buffer_pool_manager) {
+  SetKeyAt(0, key);
+  for(int i = GetSize(); i > 0; i--) {
+    SetKeyAt(i, KeyAt(i - 1));
+    SetValueAt(i, ValueAt(i - 1));
   }
-  SetValueAt(0, value);      // do not need key
+  SetValueAt(0, value);
   auto page = buffer_pool_manager->FetchPage(value);
-  if (page != nullptr)
-  {
-    auto node = reinterpret_cast<BPlusTreePage*> (page->GetData());
+  if(page != nullptr) {
+    auto node = reinterpret_cast<InternalPage *>(page->GetData());
     node->SetParentPageId(GetPageId());
     buffer_pool_manager->UnpinPage(value, true);
   }
