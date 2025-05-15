@@ -16,7 +16,7 @@
  * Deleted values are always pulled from a child.
  */
 class DeleteExecutor : public AbstractExecutor {
- public:
+public:
   /**
    * Construct a new DeleteExecutor instance.
    * @param exec_ctx The executor context
@@ -43,7 +43,7 @@ class DeleteExecutor : public AbstractExecutor {
   /** @return The output schema for the delete */
   const Schema *GetOutputSchema() const override { return plan_->OutputSchema(); }
 
- private:
+private:
   /** The delete plan node to be executed */
   const DeletePlanNode *plan_;
   TableInfo *table_info_{};

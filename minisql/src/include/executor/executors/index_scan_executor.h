@@ -12,7 +12,7 @@
  * The IndexScanExecutor executor can over a table.
  */
 class IndexScanExecutor : public AbstractExecutor {
- public:
+public:
   /**
    * Construct a new SeqScanExecutor instance.
    * @param exec_ctx The executor context
@@ -38,7 +38,7 @@ class IndexScanExecutor : public AbstractExecutor {
 
   void TupleTransfer(const Schema *table_schema, const Schema *output_schema, const Row *row, Row *output_row);
 
- private:
+private:
   vector<RowId> IndexScan(AbstractExpressionRef predicate);
 
   /** The sequential scan plan node to be executed */

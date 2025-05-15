@@ -29,6 +29,12 @@
 
 class TablePage : public Page {
  public:
+  enum UpdateStatus {
+    slotNumInvalid = 0,
+    tupleDeleted = 1,
+    notEnoughSpace = 2,
+    updateSuccess = 3
+  };
   void Init(page_id_t page_id, page_id_t prev_id, LogManager *log_mgr, Txn *txn);
 
   page_id_t GetTablePageId() { return *reinterpret_cast<page_id_t *>(GetData()); }
@@ -49,7 +55,7 @@ class TablePage : public Page {
 
   bool MarkDelete(const RowId &rid, Txn *txn, LockManager *lock_manager, LogManager *log_manager);
 
-  bool UpdateTuple(Row &new_row, Row *old_row, Schema *schema, Txn *txn, LockManager *lock_manager,
+  TablePage::UpdateStatus UpdateTuple(Row &new_row, Row *old_row, Schema *schema, Txn *txn, LockManager *lock_manager,
                    LogManager *log_manager);
 
   void ApplyDelete(const RowId &rid, Txn *txn, LogManager *log_manager);
@@ -69,7 +75,7 @@ class TablePage : public Page {
     memcpy(GetData() + OFFSET_FREE_SPACE, &free_space_pointer, sizeof(uint32_t));
   }
 
-  uint32_t GetTupleCount() { return *reinterpret_cast<uint32_t *>(GetData() + OFFSET_TUPLE_COUNT); }
+  uint32_t GetTupleCount() {return *reinterpret_cast<uint32_t *>(GetData() + OFFSET_TUPLE_COUNT); }
 
   void SetTupleCount(uint32_t tuple_count) { memcpy(GetData() + OFFSET_TUPLE_COUNT, &tuple_count, sizeof(uint32_t)); }
 

@@ -6,76 +6,92 @@
 /**
  * TODO: Student Implement
  */
-TableIterator::TableIterator(TableHeap *table_heap, RowId rid, Txn *txn) {
- table_heap_ = table_heap;
-  txn_ = txn;
-  row_id_ = rid;
-}
+TableIterator::TableIterator(TableHeap *table_heap, Row row, Txn *txn_)
+  : heap(table_heap), row(row), txn_(txn_) {}
 
 TableIterator::TableIterator(const TableIterator &other) {
-table_heap_ = other.table_heap_;
+  heap = other.heap;
+  row = other.row;
   txn_ = other.txn_;
-  row_id_ = other.row_id_;
+}
+
+TableIterator::TableIterator() {
+  heap = nullptr;
+  row = Row();
+  txn_ = nullptr;
 }
 
 TableIterator::~TableIterator() {
-  delete txn_;
-  delete table_heap_;
-  delete txn_;
+
 }
 
 bool TableIterator::operator==(const TableIterator &itr) const {
-  if (row_id_ != itr.row_id_) return false;
-  if (txn_ != itr.txn_) return false;
-  if (table_heap_ != itr.table_heap_) return false;
-  return true;
-
+  return (heap == itr.heap) && (row.GetRowId() == itr.row.GetRowId());
 }
 
 bool TableIterator::operator!=(const TableIterator &itr) const {
-  return !(*this == itr);
+  return !(operator==(itr));
 }
 
 const Row &TableIterator::operator*() {
-  Row row;
-  row.SetRowId(row_id_);
-  table_heap_->GetTuple(&row , txn_);
-  ASSERT(&row, "Invalid row.");
   return row;
 }
 
 Row *TableIterator::operator->() {
-  Row *ptr_row;
-  ptr_row->SetRowId(row_id_);
-  table_heap_->GetTuple(ptr_row, txn_);
-  ASSERT(ptr_row, "Invalid row.");
-  return ptr_row;
+  return &row;
 }
 
 TableIterator &TableIterator::operator=(const TableIterator &itr) noexcept {
-  table_heap_ = itr.table_heap_;
+  heap = itr.heap;
+  row = itr.row;
   txn_ = itr.txn_;
-  row_id_ = itr.row_id_;
   return *this;
 }
 
 // ++iter
 TableIterator &TableIterator::operator++() {
-  Row row;
-  row.SetRowId(row_id_);
-  table_heap_->GetTuple(&row, txn_);
-  RowId next_row_id = table_heap_->GetNextTupleID(&row , txn_);
-  row_id_ = next_row_id;
+  if (*this == heap->End()) {
+    return *this;
+  }
+  RowId next_rid;
+  auto page = reinterpret_cast<TablePage *>(heap->buffer_pool_manager_->FetchPage(row.GetRowId().GetPageId()));
+  page->RLatch();
+  if (page->GetNextTupleRid(row.GetRowId(), &next_rid)) {
+    row.destroy();
+    row.SetRowId(next_rid);
+    page->GetTuple(&row, heap->schema_, txn_, heap->lock_manager_);
+    page->RUnlatch();
+    heap->buffer_pool_manager_->UnpinPage(page->GetTablePageId(), false);
+    return *this;
+  }
+  else {
+
+    page_id_t next_page_id = page->GetNextPageId();
+    while (next_page_id != INVALID_PAGE_ID) {
+      page->RUnlatch();
+      heap->buffer_pool_manager_->UnpinPage(page->GetTablePageId(), false);
+      page = reinterpret_cast<TablePage *>(heap->buffer_pool_manager_->FetchPage(next_page_id));
+      page->RLatch();
+      if (page->GetFirstTupleRid(&next_rid)) {
+        row.destroy();
+        row.SetRowId(next_rid);
+        page->GetTuple(&row, heap->schema_, txn_, heap->lock_manager_);
+        page->RUnlatch();
+        heap->buffer_pool_manager_->UnpinPage(page->GetTablePageId(), false);
+        return *this;
+      }
+    }
+  }
+  page->RUnlatch();
+  heap->buffer_pool_manager_->UnpinPage(page->GetTablePageId(), false);
+  *this = heap->End();
   return *this;
+
 }
 
 // iter++
-TableIterator& TableIterator::operator++(int) {
-  Row row;
-  row.SetRowId(row_id_);
-  table_heap_->GetTuple(&row, txn_);
-  RowId next_row_id = table_heap_->GetNextTupleID(&row , txn_);
-  row_id_ = next_row_id;
-
-  return *this;
+TableIterator TableIterator::operator++(int) {
+  TableIterator old(*this);
+  ++(*this);
+  return TableIterator(old);
 }
