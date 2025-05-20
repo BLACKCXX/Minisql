@@ -179,13 +179,17 @@ void DiskManager::WritePhysicalPage(page_id_t physical_page_id, const char *page
 DiskManager::DiskManager(const std::string &db_file) : file_name_(db_file) {
   std::scoped_lock<std::recursive_mutex> lock(db_io_latch_);
   db_io_.open(db_file, std::ios::binary | std::ios::in | std::ios::out);
-  // directory or file does not exist
   if (!db_io_.is_open()) {
     db_io_.clear();
-    // create a new file
+    // 创建父目录
+    std::filesystem::path p = db_file;
+    if (p.has_parent_path()) {
+      std::filesystem::create_directories(p.parent_path());
+    }
+    // 创建新文件
     db_io_.open(db_file, std::ios::binary | std::ios::trunc | std::ios::out);
     db_io_.close();
-    // reopen with original mode
+    // 重新以读写模式打开
     db_io_.open(db_file, std::ios::binary | std::ios::in | std::ios::out);
     if (!db_io_.is_open()) {
       throw std::exception();

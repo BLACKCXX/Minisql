@@ -147,6 +147,8 @@ public:
      *  transaction in the cycle in txn_id and return true. Your function should
      *  return the first cycle it finds. If your graph has no cycles, HasCycle should return false.
      */
+    bool DFS(const txn_id_t txn_id);
+    
     bool HasCycle(txn_id_t &newest_tid_in_cycle);
 
     void DeleteNode(txn_id_t txn_id);

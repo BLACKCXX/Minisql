@@ -13,7 +13,7 @@
  * The ValuesExecutor executor produces rows of values.
  */
 class ValuesExecutor : public AbstractExecutor {
- public:
+public:
   /**
    * Construct a new ValuesExecutor instance.
    * @param exec_ctx The executor context
@@ -35,7 +35,7 @@ class ValuesExecutor : public AbstractExecutor {
   /** @return The output schema for the values */
   const Schema *GetOutputSchema() const override { return plan_->OutputSchema(); }
 
- private:
+private:
   /** The values plan node to be executed */
   const ValuesPlanNode *plan_;
   size_t value_size_{0};

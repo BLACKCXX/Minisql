@@ -114,9 +114,12 @@ class TableHeap {
         schema_(schema),
         log_manager_(log_manager),
         lock_manager_(lock_manager) {
-    auto page = reinterpret_cast<TablePage *>(buffer_pool_manager->NewPage(first_page_id_));
-    page->Init(first_page_id_,INVALID_PAGE_ID,log_manager,txn);
-    buffer_pool_manager->UnpinPage(first_page_id_, true);
+    auto first_page = reinterpret_cast<TablePage *>(buffer_pool_manager_->NewPage(first_page_id_));
+    assert(first_page != nullptr);
+    first_page->WLatch();
+    first_page->Init(first_page_id_, INVALID_PAGE_ID, log_manager_, txn);
+    first_page->WUnlatch();
+    buffer_pool_manager_->UnpinPage(first_page_id_, true);
   };
 
   explicit TableHeap(BufferPoolManager *buffer_pool_manager, page_id_t first_page_id, Schema *schema,

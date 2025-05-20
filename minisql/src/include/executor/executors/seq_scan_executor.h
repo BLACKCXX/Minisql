@@ -15,7 +15,7 @@
  * The SeqScanExecutor executor executes a sequential table scan.
  */
 class SeqScanExecutor : public AbstractExecutor {
- public:
+public:
   /**
    * Construct a new SeqScanExecutor instance.
    * @param exec_ctx The executor context
@@ -41,7 +41,7 @@ class SeqScanExecutor : public AbstractExecutor {
 
   void TupleTransfer(const Schema *table_schema, const Schema *output_schema, const Row *row, Row *output_row);
 
- private:
+private:
   /** The sequential scan plan node to be executed */
   const SeqScanPlanNode *plan_;
   TableInfo *table_info_{};

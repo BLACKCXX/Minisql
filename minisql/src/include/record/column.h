@@ -9,7 +9,7 @@
 class Column {
   friend class Schema;
 
- public:
+public:
   Column(std::string column_name, TypeId type, uint32_t index, bool nullable, bool unique);
 
   Column(std::string column_name, TypeId type, uint32_t length, uint32_t index, bool nullable, bool unique);
@@ -36,7 +36,7 @@ class Column {
 
   static uint32_t DeserializeFrom(char *buf, Column *&column);
 
- private:
+private:
   static constexpr uint32_t COLUMN_MAGIC_NUM = 210928;
   std::string name_;
   TypeId type_;

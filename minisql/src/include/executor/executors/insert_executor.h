@@ -15,7 +15,7 @@
  * Inserted values are always pulled from a child executor.
  */
 class InsertExecutor : public AbstractExecutor {
- public:
+public:
   /**
    * Construct a new InsertExecutor instance.
    * @param exec_ctx The executor context
@@ -41,7 +41,7 @@ class InsertExecutor : public AbstractExecutor {
   /** @return The output schema for the insert */
   const Schema *GetOutputSchema() const override { return plan_->OutputSchema(); }
 
- private:
+private:
   /** The insert plan node to be executed*/
   const InsertPlanNode *plan_;
   std::unique_ptr<AbstractExecutor> child_executor_;

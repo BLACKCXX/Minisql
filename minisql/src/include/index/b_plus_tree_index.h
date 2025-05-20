@@ -6,7 +6,7 @@
 #include "index/index.h"
 
 class BPlusTreeIndex : public Index {
- public:
+public:
   BPlusTreeIndex(index_id_t index_id, IndexSchema *key_schema, size_t key_size, BufferPoolManager *buffer_pool_manager);
 
   dberr_t InsertEntry(const Row &key, RowId row_id, Txn *txn) override;
@@ -23,7 +23,9 @@ class BPlusTreeIndex : public Index {
 
   IndexIterator GetEndIterator();
 
- protected:
+  BPlusTree GetContainer() { return container_; }
+
+protected:
   // comparator for key
   KeyManager processor_;
   // container

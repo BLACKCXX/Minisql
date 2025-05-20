@@ -39,29 +39,45 @@ Column::Column(const Column *other)
 * TODO: Student Implement
 */
 uint32_t Column::SerializeTo(char *buf) const {
-  // replace with your code here
-  uint32_t ofs = 0 , len;
-  MACH_WRITE_TO(uint32_t, buf, COLUMN_MAGIC_NUM);
-  ofs+= sizeof(uint32_t);
-  // 写入魔术
+  //replace with your code here
+  if (buf == nullptr) {
+    return 0;
+  }
 
-  len = name_.size() * sizeof(char);
-  memcpy(buf + ofs,&len, sizeof(uint32_t));
+  // write magic number
+  uint32_t ofs = 0;
+  MACH_WRITE_UINT32(buf + ofs, COLUMN_MAGIC_NUM);
   ofs += sizeof(uint32_t);
 
-  memcpy(buf + ofs,name_.c_str(), len);
-  ofs += len;
+  // write column name length
+  uint32_t name_len = name_.length() * sizeof(char);
+  MACH_WRITE_UINT32(buf + ofs, name_len);
+  ofs += sizeof(uint32_t);
 
-  MACH_WRITE_TO(TypeId , buf + ofs , type_);
-  ofs += sizeof(TypeId);
-  MACH_WRITE_TO(uint32_t, buf + ofs, table_ind_);
+  // write column name
+  MACH_WRITE_STRING(buf + ofs, name_);
+  ofs += name_len;
+
+  // write column type id
+  MACH_WRITE_UINT32(buf + ofs, static_cast<uint32_t>(type_));
   ofs += sizeof(uint32_t);
-  MACH_WRITE_TO(uint32_t , buf+ofs , len_);
+
+  // write column length
+  MACH_WRITE_UINT32(buf + ofs, len_);
   ofs += sizeof(uint32_t);
-  MACH_WRITE_TO(bool, buf + ofs, nullable_);
-  ofs += sizeof(bool);
-  MACH_WRITE_TO(bool, buf + ofs, unique_);
-  ofs += sizeof(bool);
+
+  // write column index
+  MACH_WRITE_UINT32(buf + ofs, table_ind_);
+  ofs += sizeof(uint32_t);
+
+  // write nullable flag
+  MACH_WRITE_UINT32(buf + ofs, static_cast<uint32_t>(nullable_));
+  ofs += sizeof(uint32_t);
+
+  // write unique flag
+  MACH_WRITE_UINT32(buf + ofs, static_cast<uint32_t>(unique_));
+  ofs += sizeof(uint32_t);
+
   return ofs;
 }
 
@@ -69,44 +85,69 @@ uint32_t Column::SerializeTo(char *buf) const {
  * TODO: Student Implement
  */
 uint32_t Column::GetSerializedSize() const {
-  // replace with your code here
-  return 4*sizeof(uint32_t) + name_.size() * sizeof(char) + sizeof(TypeId) + 2 * sizeof(bool);
-
+  // magic number + column name length + column name + column type id + column length + column index + nullable flag + unique flag
+  //sizeof(TypeId) sizeof(bool) cast to sizeof(uint32_t)
+  return sizeof(uint32_t) * 7 + name_.length() * sizeof(char);
 }
 
 /**
  * TODO: Student Implement
  */
-uint32_t Column::DeserializeFrom(char *buf, Column *&column  ) {
+uint32_t Column::DeserializeFrom(char *buf, Column *&column) {
   // replace with your code here
+  if (buf == nullptr) {
+    LOG(ERROR) << "buf is nullptr";
+    return 0;
+  }
+
+  //read magic number
   uint32_t ofs = 0;
-  uint32_t magic_num = MACH_READ_FROM(uint32_t , buf + ofs);
-  if (magic_num != COLUMN_MAGIC_NUM) {
-    LOG(ERROR)<<"COLUMN_MAGIC_NUM doesn't match!"<<std::endl;
-  }
+  uint32_t MAGIC_NUM = 0;
+  MAGIC_NUM = MACH_READ_UINT32(buf + ofs);
   ofs += sizeof(uint32_t);
-  uint32_t name_len = MACH_READ_FROM(uint32_t, buf + ofs);
-  ofs += sizeof(uint32_t);
-  char name[name_len / sizeof(char) + 1];
-  memcpy(name, buf + ofs, name_len);
-  ofs += (name_len);
-  TypeId type_id = MACH_READ_FROM(TypeId , buf + ofs);
-  ofs += sizeof(TypeId);
-  uint32_t table_ind_ = MACH_READ_FROM(uint32_t, buf + ofs);
-  ofs += sizeof(uint32_t);
-  uint32_t len_ = MACH_READ_FROM(uint32_t, buf + ofs);
-  ofs += sizeof(uint32_t);
-  bool nullable_ = MACH_READ_FROM(bool, buf + ofs);
-  ofs += sizeof(bool);
-  bool unique_ = MACH_READ_FROM(bool, buf + ofs);
-  ofs += sizeof(bool);
 
-  if (type_id == kTypeChar) {
-    column = new Column(name, type_id, len_, table_ind_, nullable_, unique_);
+  //read column name length
+  uint32_t name_len = 0;
+  name_len = MACH_READ_UINT32(buf + ofs);
+  ofs += sizeof(uint32_t);
+
+  //read column name
+  std::string col_name = "";
+  char *col_name_buf = new char[name_len];
+  memcpy(col_name_buf, buf + ofs, name_len);
+  col_name = std::string(col_name_buf);
+  ofs += name_len;
+
+  //read column type id
+  TypeId col_type;
+  col_type = static_cast<TypeId>(MACH_READ_UINT32(buf + ofs));
+  ofs += sizeof(uint32_t);
+
+  //read column length
+  uint32_t col_len = 0;
+  col_len  = MACH_READ_UINT32(buf + ofs);
+  ofs += sizeof(uint32_t);
+
+  // read column index
+  uint32_t col_index = 0;
+  col_index = MACH_READ_UINT32(buf + ofs);
+  ofs += sizeof(uint32_t);
+
+  //read nullable flag
+  bool col_nullable = false;
+  col_nullable = static_cast<bool>(MACH_READ_UINT32(buf + ofs));
+  ofs += sizeof(uint32_t);
+
+  //read unique flag
+  bool col_unique = false;
+  col_unique = static_cast<bool>(MACH_READ_UINT32(buf + ofs));
+  ofs += sizeof(uint32_t);
+
+  if (col_type == TypeId::kTypeChar) {
+    column = new Column(col_name, col_type, col_len, col_index, col_nullable, col_unique);
   } else {
-    column = new Column(name, type_id, table_ind_, nullable_, unique_);
+    column = new Column(col_name, col_type, col_index, col_nullable, col_unique);
   }
+  delete col_name_buf;
   return ofs;
-
-
 }

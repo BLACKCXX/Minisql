@@ -13,7 +13,7 @@ uint32_t Schema::SerializeTo(char *buf) const {
   MACH_WRITE_TO(uint32_t , buf + ofs , column_count);
   ofs += sizeof(uint32_t);
 
-  for (const auto &column : Schema::GetColumns()) {
+  for (const auto &column : columns_) {
     ofs += column->SerializeTo(buf + ofs);
   }
   return ofs;
@@ -25,7 +25,7 @@ uint32_t Schema::GetSerializedSize() const {
   for (const auto &column : Schema::GetColumns()) {
     initial_size += column->GetSerializedSize();
   }
-  return 0;
+  return initial_size;
 }
 
 uint32_t Schema::DeserializeFrom(char *buf, Schema *&schema) {
