@@ -37,7 +37,7 @@ TEST_F(RecoveryManagerTest, RecoveryTest) {
   auto d5 = CreateCommitLog(1);            // <T1 Commit>
   ASSERT_EQ(d3->lsn_, d4->prev_lsn_);
   ASSERT_EQ(d4->lsn_, d5->prev_lsn_);
-
+  //ASSERT_EQ(d4->next_lsn_, d5->lsn_);
   auto d6 = CreateUpdateLog(0, "C", 600, "C", 700);  // <T0, C, 600, 700>
   auto d7 = CreateAbortLog(0);                       // <T0, Abort>
   ASSERT_EQ(d2->lsn_, d6->prev_lsn_);

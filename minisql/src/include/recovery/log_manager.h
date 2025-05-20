@@ -8,6 +8,8 @@
  *
  * Implemented by student self
  */
-class LogManager {};
+class LogManager {
+
+};
 
 #endif  // MINISQL_LOG_MANAGER_H
