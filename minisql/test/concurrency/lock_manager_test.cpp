@@ -415,3 +415,52 @@ TEST_F(LockManagerTest, DeadlockDetectionTest2) {
     delete t;
   }
 }
+
+// Upgrade After Another Txn Abort Test
+// A new test to abort a transaction (both S locks)and check upgrade
+
+TEST_F(LockManagerTest, UpgradeAfterAnotherTxnAbortTest) {
+  RowId r(0, 0);
+  Txn *t1 = txn_mgr_->Begin();  
+  Txn *t2 = txn_mgr_->Begin();  
+
+  // Step 1: T1 get S lock
+  ASSERT_TRUE(lock_mgr_->LockShared(t1, r));
+  CheckGrowing(*t1);
+  CheckTxnLockSize(*t1, 1, 0);
+
+  // Step 2: T2 get S lock
+  ASSERT_TRUE(lock_mgr_->LockShared(t2, r));
+  CheckGrowing(*t2);
+  CheckTxnLockSize(*t2, 1, 0);
+
+  // Step 3: T2 want to upgrade 
+  std::atomic<bool> upgrade_success{false};
+  std::thread upgrade_thread([&]() {
+    try {
+      upgrade_success = lock_mgr_->LockUpgrade(t2, r); // waiting
+    } catch (...) {
+      upgrade_success = false;
+    }
+  });
+
+  // Step 4: T2 to wait
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+  // Step 5: abort T1，let T2 continue
+  txn_mgr_->Abort(t1);
+  CheckAborted(*t1);
+
+  // Step 6: wait for upgrade
+  upgrade_thread.join();
+
+  // Step 7: ensure T2 get X lock
+  ASSERT_TRUE(upgrade_success);
+  CheckGrowing(*t2);
+  CheckTxnLockSize(*t2, 0, 1); 
+
+  txn_mgr_->Commit(t2);
+  CheckCommitted(*t2);
+  delete t1;
+  delete t2;
+}
